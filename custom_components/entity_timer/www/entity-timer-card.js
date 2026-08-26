@@ -1,42 +1,42 @@
 /**
- * entity-override-card
+ * entity-timer-card
  *
- * Part of the "Entity Override" Home Assistant integration.
+ * Part of the "Entity Timer" Home Assistant integration.
  *
  * Displays one entity. Tapping it opens a dialog with two options —
  * "Turn ON until" and "Turn OFF until" — each with a date/time picker.
- * Confirming calls entity_override.set, which flips the entity now and
+ * Confirming calls entity_timer.set, which flips the entity now and
  * schedules reverting it at the chosen date/time. The integration persists
- * pending overrides and reschedules them on restart, so a reboot mid-
+ * pending timers and reschedules them on restart, so a reboot mid-
  * countdown does not lose the revert.
  *
- * While an override is pending, the card shows a live countdown to the
- * scheduled flip, read reactively from sensor.entity_override_pending
+ * While a timer is pending, the card shows a live countdown to the
+ * scheduled flip, read reactively from sensor.entity_timer_pending
  * (no polling — it just watches hass state like any other card).
  *
  * Config:
- *   type: custom:entity-override-card
+ *   type: custom:entity-timer-card
  *   entity: switch.something   (required)
  *   name: Friendly name        (optional, defaults to entity's name)
  *   icon: mdi:something        (optional, defaults to entity's icon)
  */
 
-const PENDING_SENSOR_ENTITY_ID = "sensor.entity_override_pending";
+const PENDING_SENSOR_ENTITY_ID = "sensor.entity_timer_pending";
 
-class EntityOverrideCard extends HTMLElement {
+class EntityTimerCard extends HTMLElement {
   setConfig(config) {
     if (!config.entity) {
       throw new Error("Please define an entity");
     }
     this._config = config;
-    this._override = null; // { due: ISOstring, description: 'on'|'off' }
+    this._timer = null; // { due: ISOstring, description: 'on'|'off' }
     this._buildCard();
   }
 
   set hass(hass) {
     this._hass = hass;
     this._updateCard();
-    this._updateOverrideFromHass();
+    this._updateTimerFromHass();
   }
 
   connectedCallback() {
@@ -93,15 +93,15 @@ class EntityOverrideCard extends HTMLElement {
           font-size: 0.85em;
           color: var(--secondary-text-color);
         }
-        .override {
+        .timer {
           font-size: 0.85em;
           color: var(--primary-color);
           display: none;
         }
-        .override.visible {
+        .timer.visible {
           display: block;
         }
-        .override-btn {
+        .timer-btn {
           border: none;
           border-radius: 8px;
           padding: 10px 16px;
@@ -114,16 +114,16 @@ class EntityOverrideCard extends HTMLElement {
           transition: filter 0.15s ease, box-shadow 0.15s ease;
           box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
         }
-        .override-btn:hover {
+        .timer-btn:hover {
           filter: brightness(1.1);
         }
-        .override-btn:active {
+        .timer-btn:active {
           filter: brightness(0.9);
         }
-        .override-btn.on {
+        .timer-btn.on {
           background: var(--success-color, #4caf50);
         }
-        .override-btn.off {
+        .timer-btn.off {
           background: var(--error-color, #db4437);
         }
       </style>
@@ -132,7 +132,7 @@ class EntityOverrideCard extends HTMLElement {
         <div class="info">
           <div class="name" id="name"></div>
           <div class="state" id="state"></div>
-          <div class="override" id="override"></div>
+          <div class="timer" id="timer"></div>
         </div>
       </ha-card>
     `;
@@ -170,40 +170,40 @@ class EntityOverrideCard extends HTMLElement {
       this._config.icon || stateObj.attributes.icon || "mdi:toggle-switch-outline";
   }
 
-  _updateOverrideFromHass() {
+  _updateTimerFromHass() {
     const sensor = this._hass.states[PENDING_SENSOR_ENTITY_ID];
-    const overrides = (sensor && sensor.attributes && sensor.attributes.overrides) || {};
-    const info = overrides[this._config.entity];
-    this._override = info ? { due: info.until, description: info.revert_state } : null;
+    const timers = (sensor && sensor.attributes && sensor.attributes.timers) || {};
+    const info = timers[this._config.entity];
+    this._timer = info ? { due: info.until, description: info.revert_state } : null;
     this._tick();
   }
 
   _tick() {
-    const el = this.shadowRoot && this.shadowRoot.getElementById("override");
+    const el = this.shadowRoot && this.shadowRoot.getElementById("timer");
     if (!el) return;
 
-    if (!this._override) {
+    if (!this._timer) {
       el.classList.remove("visible");
       el.textContent = "";
       return;
     }
 
-    const remainingMs = new Date(this._override.due).getTime() - Date.now();
+    const remainingMs = new Date(this._timer.due).getTime() - Date.now();
     if (remainingMs <= 0) {
       // The integration reverts to-the-second, so this should be
       // momentary — shown only for the brief window before the next
-      // hass state update clears this._override.
+      // hass state update clears this._timer.
       el.classList.add("visible");
-      el.textContent = `Turns ${this._overrideVerb()} any moment…`;
+      el.textContent = `Turns ${this._timerVerb()} any moment…`;
       return;
     }
 
     el.classList.add("visible");
-    el.textContent = `Turns ${this._overrideVerb()} in ${this._formatDuration(remainingMs)}`;
+    el.textContent = `Turns ${this._timerVerb()} in ${this._formatDuration(remainingMs)}`;
   }
 
-  _overrideVerb() {
-    return this._override && this._override.description === "on" ? "ON" : "OFF";
+  _timerVerb() {
+    return this._timer && this._timer.description === "on" ? "ON" : "OFF";
   }
 
   _formatDuration(ms) {
@@ -296,12 +296,12 @@ class EntityOverrideCard extends HTMLElement {
 
     const button = document.createElement("button");
     button.type = "button";
-    button.className = `override-btn ${state}`;
+    button.className = `timer-btn ${state}`;
     button.textContent = state === "on" ? "Turn ON" : "Turn OFF";
     button.addEventListener("click", () => {
       if (!input.value) return;
       const untilIso = new Date(input.value).toISOString();
-      this._hass.callService("entity_override", "set", {
+      this._hass.callService("entity_timer", "set", {
         entity_id: this._config.entity,
         state,
         until: untilIso,
@@ -309,7 +309,7 @@ class EntityOverrideCard extends HTMLElement {
 
       // Optimistic local update — show the countdown immediately instead of
       // waiting for the next state update.
-      this._override = { due: untilIso, description: state === "on" ? "off" : "on" };
+      this._timer = { due: untilIso, description: state === "on" ? "off" : "on" };
       this._tick();
 
       dialog.open = false;
@@ -323,11 +323,11 @@ class EntityOverrideCard extends HTMLElement {
   }
 }
 
-customElements.define("entity-override-card", EntityOverrideCard);
+customElements.define("entity-timer-card", EntityTimerCard);
 
 window.customCards = window.customCards || [];
 window.customCards.push({
-  type: "entity-override-card",
-  name: "Entity Override Card",
+  type: "entity-timer-card",
+  name: "Entity Timer Card",
   description: "Tap an entity to schedule turning it on or off until a chosen date & time.",
 });

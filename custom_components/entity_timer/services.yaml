@@ -1,8 +1,8 @@
 set:
-  name: Set override
+  name: Set timer
   description: >-
     Turn an entity on or off immediately and schedule reverting it back
-    at a given date & time. Replaces any existing pending override for
+    at a given date & time. Replaces any existing pending timer for
     the same entity.
   fields:
     entity_id:
@@ -27,9 +27,9 @@ set:
         datetime: {}
 
 cancel:
-  name: Cancel override
+  name: Cancel timer
   description: >-
-    Cancel a pending override for an entity, without changing its
+    Cancel a pending timer for an entity, without changing its
     current state.
   fields:
     entity_id:

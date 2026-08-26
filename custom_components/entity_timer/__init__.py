@@ -1,7 +1,7 @@
-"""The Entity Override integration.
+"""The Entity Timer integration.
 
 Turns any entity on or off immediately and schedules reverting it at a
-chosen date & time. Pending overrides are persisted to storage and
+chosen date & time. Pending timers are persisted to storage and
 rescheduled on restart, so a reboot mid-countdown does not lose the
 revert. Ships a companion Lovelace card (auto-registered as a frontend
 resource) that provides the "turn on/off until" popup UI.
@@ -35,7 +35,7 @@ from .const import (
     DOMAIN,
     SERVICE_CANCEL,
     SERVICE_SET,
-    SIGNAL_OVERRIDES_UPDATED,
+    SIGNAL_TIMERS_UPDATED,
     STORAGE_KEY,
     STORAGE_VERSION,
 )
@@ -55,25 +55,25 @@ SET_SCHEMA = vol.Schema(
 CANCEL_SCHEMA = vol.Schema({vol.Required(ATTR_ENTITY_ID): cv.entity_id})
 
 
-class OverrideManager:
-    """Owns the pending-overrides store and their scheduled reverts."""
+class EntityTimerManager:
+    """Owns the pending-timers store and their scheduled reverts."""
 
     def __init__(self, hass: HomeAssistant) -> None:
         self.hass = hass
         self._store: Store = Store(hass, STORAGE_VERSION, STORAGE_KEY)
-        self._overrides: dict[str, dict[str, str]] = {}
+        self._timers: dict[str, dict[str, str]] = {}
         self._unsub_timers: dict[str, Any] = {}
 
     @property
-    def overrides(self) -> dict[str, dict[str, str]]:
-        return self._overrides
+    def timers(self) -> dict[str, dict[str, str]]:
+        return self._timers
 
     async def async_load(self) -> None:
-        self._overrides = await self._store.async_load() or {}
+        self._timers = await self._store.async_load() or {}
 
     async def _async_save(self) -> None:
-        await self._store.async_save(self._overrides)
-        async_dispatcher_send(self.hass, SIGNAL_OVERRIDES_UPDATED)
+        await self._store.async_save(self._timers)
+        async_dispatcher_send(self.hass, SIGNAL_TIMERS_UPDATED)
 
     async def _async_call_state(self, entity_id: str, state: str) -> None:
         service = "turn_on" if state == "on" else "turn_off"
@@ -81,7 +81,7 @@ class OverrideManager:
             "homeassistant", service, {ATTR_ENTITY_ID: entity_id}, blocking=True
         )
 
-    def _cancel_timer(self, entity_id: str) -> None:
+    def _cancel_timer_callback(self, entity_id: str) -> None:
         unsub = self._unsub_timers.pop(entity_id, None)
         if unsub is not None:
             unsub()
@@ -90,7 +90,7 @@ class OverrideManager:
         async def _revert(_now: datetime) -> None:
             self._unsub_timers.pop(entity_id, None)
             await self._async_call_state(entity_id, revert_state)
-            self._overrides.pop(entity_id, None)
+            self._timers.pop(entity_id, None)
             await self._async_save()
 
         self._unsub_timers[entity_id] = async_track_point_in_time(self.hass, _revert, until)
@@ -99,9 +99,9 @@ class OverrideManager:
         """Apply the requested state now and schedule reverting it at `until`."""
         await self._async_call_state(entity_id, state)
 
-        self._cancel_timer(entity_id)
+        self._cancel_timer_callback(entity_id)
         revert_state = "off" if state == "on" else "on"
-        self._overrides[entity_id] = {
+        self._timers[entity_id] = {
             "revert_state": revert_state,
             "until": dt_util.as_utc(until).isoformat(),
         }
@@ -109,24 +109,24 @@ class OverrideManager:
         self._schedule_revert(entity_id, dt_util.as_utc(until), revert_state)
 
     async def async_cancel(self, entity_id: str) -> None:
-        """Cancel a pending override without changing the entity's current state."""
-        self._cancel_timer(entity_id)
-        if self._overrides.pop(entity_id, None) is not None:
+        """Cancel a pending timer without changing the entity's current state."""
+        self._cancel_timer_callback(entity_id)
+        if self._timers.pop(entity_id, None) is not None:
             await self._async_save()
 
     async def async_reschedule_all(self) -> None:
-        """Called on startup: reschedule pending overrides, revert any already due."""
+        """Called on startup: reschedule pending timers, revert any already due."""
         now = dt_util.utcnow()
         changed = False
-        for entity_id, info in list(self._overrides.items()):
+        for entity_id, info in list(self._timers.items()):
             until = dt_util.parse_datetime(info["until"])
             if until is None:
-                self._overrides.pop(entity_id, None)
+                self._timers.pop(entity_id, None)
                 changed = True
                 continue
             if until <= now:
                 await self._async_call_state(entity_id, info["revert_state"])
-                self._overrides.pop(entity_id, None)
+                self._timers.pop(entity_id, None)
                 changed = True
             else:
                 self._schedule_revert(entity_id, until, info["revert_state"])
@@ -140,7 +140,7 @@ class OverrideManager:
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    manager = OverrideManager(hass)
+    manager = EntityTimerManager(hass)
     await manager.async_load()
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = manager
@@ -171,7 +171,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
-        manager: OverrideManager = hass.data[DOMAIN].pop(entry.entry_id)
+        manager: EntityTimerManager = hass.data[DOMAIN].pop(entry.entry_id)
         manager.async_shutdown()
         if not hass.data[DOMAIN]:
             hass.services.async_remove(DOMAIN, SERVICE_SET)

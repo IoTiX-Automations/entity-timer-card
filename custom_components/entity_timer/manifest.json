@@ -1,0 +1,13 @@
+{
+  "domain": "entity_timer",
+  "name": "Entity Timer",
+  "codeowners": ["@IoTiX"],
+  "config_flow": true,
+  "dependencies": ["frontend", "http"],
+  "documentation": "https://github.com/IoTiX/entity-timer-card",
+  "integration_type": "service",
+  "iot_class": "calculated",
+  "issue_tracker": "https://github.com/IoTiX/entity-timer-card/issues",
+  "requirements": [],
+  "version": "1.0.0"
+}

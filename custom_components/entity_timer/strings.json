@@ -2,22 +2,22 @@
   "config": {
     "step": {
       "user": {
-        "title": "Entity Override",
-        "description": "Adds services to turn an entity on or off until a chosen date & time, plus a companion 'entity-override-card' Lovelace card. No configuration needed — press Submit."
+        "title": "Entity Timer",
+        "description": "Adds services to turn an entity on or off until a chosen date & time, plus a companion 'entity-timer-card' Lovelace card. No configuration needed — press Submit."
       }
     },
     "abort": {
-      "single_instance_allowed": "Entity Override is already configured. Only a single instance is needed."
+      "single_instance_allowed": "Entity Timer is already configured. Only a single instance is needed."
     }
   },
   "services": {
     "set": {
-      "name": "Set override",
+      "name": "Set timer",
       "description": "Turn an entity on or off immediately and schedule reverting it back at a given date & time.",
       "fields": {
         "entity_id": {
           "name": "Entity",
-          "description": "The entity to override."
+          "description": "The entity to control."
         },
         "state": {
           "name": "State",
@@ -30,12 +30,12 @@
       }
     },
     "cancel": {
-      "name": "Cancel override",
-      "description": "Cancel a pending override for an entity, without changing its current state.",
+      "name": "Cancel timer",
+      "description": "Cancel a pending timer for an entity, without changing its current state.",
       "fields": {
         "entity_id": {
           "name": "Entity",
-          "description": "The entity whose pending override should be cancelled."
+          "description": "The entity whose pending timer should be cancelled."
         }
       }
     }
