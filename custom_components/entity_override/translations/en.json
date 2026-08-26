@@ -1,0 +1,43 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Entity Override",
+        "description": "Adds services to turn an entity on or off until a chosen date & time, plus a companion 'entity-override-card' Lovelace card. No configuration needed — press Submit."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Entity Override is already configured. Only a single instance is needed."
+    }
+  },
+  "services": {
+    "set": {
+      "name": "Set override",
+      "description": "Turn an entity on or off immediately and schedule reverting it back at a given date & time.",
+      "fields": {
+        "entity_id": {
+          "name": "Entity",
+          "description": "The entity to override."
+        },
+        "state": {
+          "name": "State",
+          "description": "The state to apply now."
+        },
+        "until": {
+          "name": "Until",
+          "description": "When to revert the entity to its previous state."
+        }
+      }
+    },
+    "cancel": {
+      "name": "Cancel override",
+      "description": "Cancel a pending override for an entity, without changing its current state.",
+      "fields": {
+        "entity_id": {
+          "name": "Entity",
+          "description": "The entity whose pending override should be cancelled."
+        }
+      }
+    }
+  }
+}

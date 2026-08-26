@@ -1,0 +1,39 @@
+set:
+  name: Set override
+  description: >-
+    Turn an entity on or off immediately and schedule reverting it back
+    at a given date & time. Replaces any existing pending override for
+    the same entity.
+  fields:
+    entity_id:
+      name: Entity
+      required: true
+      selector:
+        entity: {}
+    state:
+      name: State
+      description: The state to apply now.
+      required: true
+      selector:
+        select:
+          options:
+            - "on"
+            - "off"
+    until:
+      name: Until
+      description: When to revert the entity to its previous state.
+      required: true
+      selector:
+        datetime: {}
+
+cancel:
+  name: Cancel override
+  description: >-
+    Cancel a pending override for an entity, without changing its
+    current state.
+  fields:
+    entity_id:
+      name: Entity
+      required: true
+      selector:
+        entity: {}
