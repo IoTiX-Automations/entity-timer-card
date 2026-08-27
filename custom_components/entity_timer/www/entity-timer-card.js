@@ -126,6 +126,21 @@ class EntityTimerCard extends HTMLElement {
         .timer-btn.off {
           background: var(--error-color, #db4437);
         }
+        .timer-btn.cancel {
+          background: var(--disabled-text-color, #757575);
+        }
+        .cancel-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          padding-bottom: 4px;
+          border-bottom: 1px solid var(--divider-color, rgba(0, 0, 0, 0.12));
+        }
+        .cancel-row .label {
+          font-size: 0.95em;
+          color: var(--primary-color);
+        }
       </style>
       <ha-card tabindex="0" role="button">
         <ha-icon id="icon"></ha-icon>
@@ -263,6 +278,10 @@ class EntityTimerCard extends HTMLElement {
     wrap.style.gap = "20px";
     wrap.style.minWidth = "280px";
 
+    if (this._timer) {
+      wrap.appendChild(this._buildCancelRow(dialog));
+    }
+
     const onRow = this._buildRow(
       "Turn ON until",
       this._defaultDateTimeLocal(1),
@@ -284,6 +303,39 @@ class EntityTimerCard extends HTMLElement {
 
     this.shadowRoot.appendChild(dialog);
     this._dialog = dialog;
+  }
+
+  _buildCancelRow(dialog) {
+    const row = document.createElement("div");
+    row.className = "cancel-row";
+
+    const labelEl = document.createElement("div");
+    labelEl.className = "label";
+    const remainingMs = new Date(this._timer.due).getTime() - Date.now();
+    labelEl.textContent =
+      remainingMs > 0
+        ? `Currently: turns ${this._timerVerb()} in ${this._formatDuration(remainingMs)}`
+        : `Currently: turns ${this._timerVerb()} any moment…`;
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "timer-btn cancel";
+    button.textContent = "Cancel";
+    button.addEventListener("click", () => {
+      this._hass.callService("entity_timer", "cancel", {
+        entity_id: this._config.entity,
+      });
+
+      this._timer = null;
+      this._timerSetAt = Date.now();
+      this._tick();
+
+      dialog.open = false;
+    });
+
+    row.appendChild(labelEl);
+    row.appendChild(button);
+    return row;
   }
 
   _buildRow(label, defaultValue, state, dialog) {
