@@ -24,6 +24,13 @@
 const PENDING_SENSOR_ENTITY_ID = "sensor.entity_timer_pending";
 const OPTIMISTIC_GRACE_MS = 8000;
 
+// Module-level (not per-instance) so a just-set optimistic value survives
+// Lovelace recreating the card element — which happens on things like a
+// websocket reconnect (common over remote/cloud access) — since the ES
+// module itself stays loaded and isn't re-evaluated when that happens.
+// Keyed by entity_id: { timer: {due, description} | null, setAt: number }
+const optimisticByEntity = new Map();
+
 class EntityTimerCard extends HTMLElement {
   setConfig(config) {
     if (!config.entity) {
@@ -196,13 +203,19 @@ class EntityTimerCard extends HTMLElement {
     // card can receive one or more hass updates carrying a stale
     // snapshot of the sensor before it actually reflects our change.
     // Trust our own optimistic value for a few seconds rather than
-    // comparing server timestamps against the browser's clock (fragile:
-    // depends on clock sync and field availability, and got this wrong
-    // before). After the grace period, resume trusting the sensor.
-    if (this._timerSetAt && Date.now() - this._timerSetAt < OPTIMISTIC_GRACE_MS) {
-      return;
+    // comparing server timestamps against the browser's clock. Read
+    // from the module-level map (see top of file), not an instance
+    // field, so this still holds even if Lovelace recreated this card
+    // element in the meantime.
+    const optimistic = optimisticByEntity.get(this._config.entity);
+    if (optimistic) {
+      if (Date.now() - optimistic.setAt < OPTIMISTIC_GRACE_MS) {
+        this._timer = optimistic.timer;
+        this._tick();
+        return;
+      }
+      optimisticByEntity.delete(this._config.entity);
     }
-    this._timerSetAt = null;
 
     const timers = (sensor.attributes && sensor.attributes.timers) || {};
     const info = timers[this._config.entity];
@@ -330,7 +343,7 @@ class EntityTimerCard extends HTMLElement {
       });
 
       this._timer = null;
-      this._timerSetAt = Date.now();
+      optimisticByEntity.set(this._config.entity, { timer: null, setAt: Date.now() });
       this._tick();
 
       dialog.open = false;
@@ -377,10 +390,10 @@ class EntityTimerCard extends HTMLElement {
       });
 
       // Optimistic local update — show the countdown immediately instead of
-      // waiting for the next state update. _timerSetAt marks it so a
-      // stale hass update (see _updateTimerFromHass) can't clobber it.
+      // waiting for the next state update. Recorded in optimisticByEntity
+      // (see _updateTimerFromHass) so a stale hass update can't clobber it.
       this._timer = { due: untilIso, description: state === "on" ? "off" : "on" };
-      this._timerSetAt = Date.now();
+      optimisticByEntity.set(this._config.entity, { timer: this._timer, setAt: Date.now() });
       this._tick();
 
       dialog.open = false;
