@@ -7,7 +7,9 @@ reverts it.
 Tap the card → a dialog opens with two options, **"Turn ON until"** and
 **"Turn OFF until"**, each with a date/time picker. Confirming flips the
 entity immediately and schedules reverting it back at the chosen moment.
-The card shows a live countdown to the scheduled flip.
+The card shows a live countdown to the scheduled flip. If a timer is
+already pending, the dialog also shows a **Cancel** option to stop it
+early without changing the entity's current state.
 
 Pending timers are persisted to storage and rescheduled on startup, so
 a Home Assistant restart mid-countdown does not lose the revert.
