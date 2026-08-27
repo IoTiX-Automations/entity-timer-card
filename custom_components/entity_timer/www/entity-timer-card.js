@@ -22,6 +22,7 @@
  */
 
 const PENDING_SENSOR_ENTITY_ID = "sensor.entity_timer_pending";
+const OPTIMISTIC_GRACE_MS = 8000;
 
 class EntityTimerCard extends HTMLElement {
   setConfig(config) {
@@ -189,17 +190,19 @@ class EntityTimerCard extends HTMLElement {
     const sensor = this._hass.states[PENDING_SENSOR_ENTITY_ID];
     if (!sensor) return;
 
-    // Guard against a race: setting a timer flips the target entity's own
-    // state first and the pending-timers sensor second, so this card can
-    // receive a hass update for the entity's change before the sensor
-    // reflects the new timer. Ignore any sensor snapshot older than our
-    // own optimistic update so it can't clobber it with a stale "nothing
-    // pending" read.
-    if (this._timerSetAt) {
-      const sensorUpdatedAt = new Date(sensor.last_updated).getTime();
-      if (sensorUpdatedAt < this._timerSetAt) return;
-      this._timerSetAt = null;
+    // Grace period after our own optimistic set/cancel: setting a timer
+    // flips the target entity's own state first and the pending-timers
+    // sensor second (and cancelling only touches the sensor), so this
+    // card can receive one or more hass updates carrying a stale
+    // snapshot of the sensor before it actually reflects our change.
+    // Trust our own optimistic value for a few seconds rather than
+    // comparing server timestamps against the browser's clock (fragile:
+    // depends on clock sync and field availability, and got this wrong
+    // before). After the grace period, resume trusting the sensor.
+    if (this._timerSetAt && Date.now() - this._timerSetAt < OPTIMISTIC_GRACE_MS) {
+      return;
     }
+    this._timerSetAt = null;
 
     const timers = (sensor.attributes && sensor.attributes.timers) || {};
     const info = timers[this._config.entity];
