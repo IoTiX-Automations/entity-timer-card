@@ -172,7 +172,21 @@ class EntityTimerCard extends HTMLElement {
 
   _updateTimerFromHass() {
     const sensor = this._hass.states[PENDING_SENSOR_ENTITY_ID];
-    const timers = (sensor && sensor.attributes && sensor.attributes.timers) || {};
+    if (!sensor) return;
+
+    // Guard against a race: setting a timer flips the target entity's own
+    // state first and the pending-timers sensor second, so this card can
+    // receive a hass update for the entity's change before the sensor
+    // reflects the new timer. Ignore any sensor snapshot older than our
+    // own optimistic update so it can't clobber it with a stale "nothing
+    // pending" read.
+    if (this._timerSetAt) {
+      const sensorUpdatedAt = new Date(sensor.last_updated).getTime();
+      if (sensorUpdatedAt < this._timerSetAt) return;
+      this._timerSetAt = null;
+    }
+
+    const timers = (sensor.attributes && sensor.attributes.timers) || {};
     const info = timers[this._config.entity];
     this._timer = info ? { due: info.until, description: info.revert_state } : null;
     this._tick();
@@ -308,8 +322,10 @@ class EntityTimerCard extends HTMLElement {
       });
 
       // Optimistic local update — show the countdown immediately instead of
-      // waiting for the next state update.
+      // waiting for the next state update. _timerSetAt marks it so a
+      // stale hass update (see _updateTimerFromHass) can't clobber it.
       this._timer = { due: untilIso, description: state === "on" ? "off" : "on" };
+      this._timerSetAt = Date.now();
       this._tick();
 
       dialog.open = false;
