@@ -22,14 +22,6 @@
  */
 
 const PENDING_SENSOR_ENTITY_ID = "sensor.entity_timer_pending";
-const OPTIMISTIC_GRACE_MS = 8000;
-
-// Module-level (not per-instance) so a just-set optimistic value survives
-// Lovelace recreating the card element — which happens on things like a
-// websocket reconnect (common over remote/cloud access) — since the ES
-// module itself stays loaded and isn't re-evaluated when that happens.
-// Keyed by entity_id: { timer: {due, description} | null, setAt: number }
-const optimisticByEntity = new Map();
 
 class EntityTimerCard extends HTMLElement {
   setConfig(config) {
@@ -197,26 +189,11 @@ class EntityTimerCard extends HTMLElement {
     const sensor = this._hass.states[PENDING_SENSOR_ENTITY_ID];
     if (!sensor) return;
 
-    // Grace period after our own optimistic set/cancel: setting a timer
-    // flips the target entity's own state first and the pending-timers
-    // sensor second (and cancelling only touches the sensor), so this
-    // card can receive one or more hass updates carrying a stale
-    // snapshot of the sensor before it actually reflects our change.
-    // Trust our own optimistic value for a few seconds rather than
-    // comparing server timestamps against the browser's clock. Read
-    // from the module-level map (see top of file), not an instance
-    // field, so this still holds even if Lovelace recreated this card
-    // element in the meantime.
-    const optimistic = optimisticByEntity.get(this._config.entity);
-    if (optimistic) {
-      if (Date.now() - optimistic.setAt < OPTIMISTIC_GRACE_MS) {
-        this._timer = optimistic.timer;
-        this._tick();
-        return;
-      }
-      optimisticByEntity.delete(this._config.entity);
-    }
-
+    // The backend commits the pending-timer sensor before it ever
+    // changes the target entity's own state (both on set and on
+    // revert), so this is always safe to read directly — no local
+    // optimistic bookkeeping needed. That also means any number of
+    // card instances, anywhere, always converge on the same truth.
     const timers = (sensor.attributes && sensor.attributes.timers) || {};
     const info = timers[this._config.entity];
     this._timer = info ? { due: info.until, description: info.revert_state } : null;
@@ -342,8 +319,8 @@ class EntityTimerCard extends HTMLElement {
         entity_id: this._config.entity,
       });
 
+      // Instant feedback; the next hass update (moments away) confirms it.
       this._timer = null;
-      optimisticByEntity.set(this._config.entity, { timer: null, setAt: Date.now() });
       this._tick();
 
       dialog.open = false;
@@ -389,11 +366,8 @@ class EntityTimerCard extends HTMLElement {
         until: untilIso,
       });
 
-      // Optimistic local update — show the countdown immediately instead of
-      // waiting for the next state update. Recorded in optimisticByEntity
-      // (see _updateTimerFromHass) so a stale hass update can't clobber it.
+      // Instant feedback; the next hass update (moments away) confirms it.
       this._timer = { due: untilIso, description: state === "on" ? "off" : "on" };
-      optimisticByEntity.set(this._config.entity, { timer: this._timer, setAt: Date.now() });
       this._tick();
 
       dialog.open = false;

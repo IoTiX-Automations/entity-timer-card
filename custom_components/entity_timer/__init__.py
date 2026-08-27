@@ -93,24 +93,32 @@ class EntityTimerManager:
     def _schedule_revert(self, entity_id: str, until: datetime, revert_state: str) -> None:
         async def _revert(_now: datetime) -> None:
             self._unsub_timers.pop(entity_id, None)
-            await self._async_call_state(entity_id, revert_state)
             self._timers.pop(entity_id, None)
+            # Sensor commits before the entity's own state changes (see
+            # async_set for why) so any card watching this entity already
+            # sees "no pending timer" by the time it observes the revert.
             await self._async_save()
+            await self._async_call_state(entity_id, revert_state)
 
         self._unsub_timers[entity_id] = async_track_point_in_time(self.hass, _revert, until)
 
     async def async_set(self, entity_id: str, state: str, until: datetime) -> None:
-        """Apply the requested state now and schedule reverting it at `until`."""
-        await self._async_call_state(entity_id, state)
-
+        """Schedule reverting entity_id at `until`, then apply the requested state now."""
         self._cancel_timer_callback(entity_id)
         revert_state = "off" if state == "on" else "on"
         self._timers[entity_id] = {
             "revert_state": revert_state,
             "until": dt_util.as_utc(until).isoformat(),
         }
+        # Sensor commits before the entity's own state changes. Any card
+        # watching this entity_id (there can be any number, in any number
+        # of places) gets a state_changed event for the sensor before one
+        # for the entity, so by the time it reacts to the entity's own
+        # change, the pending-timer data it would look up is already
+        # correct — no card-local bookkeeping needed to avoid a race.
         await self._async_save()
         self._schedule_revert(entity_id, dt_util.as_utc(until), revert_state)
+        await self._async_call_state(entity_id, state)
 
     async def async_cancel(self, entity_id: str) -> None:
         """Cancel a pending timer without changing the entity's current state."""
@@ -121,21 +129,23 @@ class EntityTimerManager:
     async def async_reschedule_all(self) -> None:
         """Called on startup: reschedule pending timers, revert any already due."""
         now = dt_util.utcnow()
+        due: list[tuple[str, str]] = []
         changed = False
         for entity_id, info in list(self._timers.items()):
             until = dt_util.parse_datetime(info["until"])
             if until is None:
                 self._timers.pop(entity_id, None)
                 changed = True
-                continue
-            if until <= now:
-                await self._async_call_state(entity_id, info["revert_state"])
+            elif until <= now:
                 self._timers.pop(entity_id, None)
+                due.append((entity_id, info["revert_state"]))
                 changed = True
             else:
                 self._schedule_revert(entity_id, until, info["revert_state"])
         if changed:
             await self._async_save()
+        for entity_id, revert_state in due:
+            await self._async_call_state(entity_id, revert_state)
 
     def async_shutdown(self) -> None:
         for unsub in list(self._unsub_timers.values()):
