@@ -22,14 +22,21 @@ a Home Assistant restart mid-countdown does not lose the revert.
    Timer").
 2. Install **Entity Timer**, then restart Home Assistant.
 3. Settings → Devices & Services → Add Integration → **Entity Timer**
-   (no configuration fields — just confirm). This also auto-registers
-   the companion card as a frontend resource.
+   (no configuration fields — just confirm).
+4. Add the card's script as a dashboard resource: Settings → Dashboards
+   → ⋮ (top right) → Resources → Add Resource →
+   URL: `/entity_timer_static/entity-timer-card.js`, Resource type:
+   **JavaScript Module**. (Home Assistant's Lovelace only recognizes
+   custom card elements registered this way — its newer scoped
+   custom-element-registry system does not pick up cards injected via
+   the generic `frontend.add_extra_js_url` API, even though that API
+   successfully serves and executes the script.)
 
 ### Manual
 
 Copy `custom_components/entity_timer` into your Home Assistant
-`config/custom_components/` directory, restart, then add the integration
-as above.
+`config/custom_components/` directory, restart, add the integration,
+then add the dashboard resource — all as above.
 
 ## Using the card
 

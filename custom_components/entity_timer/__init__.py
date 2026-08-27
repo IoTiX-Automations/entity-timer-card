@@ -3,8 +3,13 @@
 Turns any entity on or off immediately and schedules reverting it at a
 chosen date & time. Pending timers are persisted to storage and
 rescheduled on restart, so a reboot mid-countdown does not lose the
-revert. Ships a companion Lovelace card (auto-registered as a frontend
-resource) that provides the "turn on/off until" popup UI.
+revert. Ships a companion Lovelace card that provides the "turn on/off
+until" popup UI; this component serves the card's script but does not
+auto-register it as a dashboard resource — Lovelace's scoped
+custom-element-registry only recognizes cards added as an actual
+dashboard resource (Settings > Dashboards > Resources), not scripts
+injected via frontend.add_extra_js_url (that API works for panels, not
+Lovelace card elements). See the README for the one-time setup step.
 """
 
 from __future__ import annotations
@@ -16,7 +21,6 @@ from typing import Any
 
 import voluptuous as vol
 
-from homeassistant.components.frontend import add_extra_js_url
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall, callback
@@ -156,13 +160,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.services.async_register(DOMAIN, SERVICE_SET, _handle_set, schema=SET_SCHEMA)
     hass.services.async_register(DOMAIN, SERVICE_CANCEL, _handle_cancel, schema=CANCEL_SCHEMA)
 
-    # Serve the companion card and auto-register it as a frontend resource,
-    # so installers never have to add a dashboard resource by hand.
+    # Serve the companion card's script. It still needs to be added as a
+    # dashboard resource once (Settings > Dashboards > Resources) — see
+    # the README; Lovelace does not pick up card elements from
+    # frontend.add_extra_js_url.
     www_dir = pathlib.Path(__file__).parent / "www"
     await hass.http.async_register_static_paths(
         [StaticPathConfig(CARD_URL_PATH, str(www_dir / CARD_JS_FILENAME), cache_headers=False)]
     )
-    add_extra_js_url(hass, CARD_URL_PATH)
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
