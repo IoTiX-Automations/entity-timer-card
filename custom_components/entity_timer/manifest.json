@@ -1,13 +1,13 @@
 {
   "domain": "entity_timer",
   "name": "Entity Timer",
-  "codeowners": ["@IoTiX-Automation"],
+  "codeowners": ["@IoTiX-Automations"],
   "config_flow": true,
   "dependencies": ["frontend", "http"],
-  "documentation": "https://github.com/IoTiX-Automation/entity-timer-card",
+  "documentation": "https://github.com/IoTiX-Automations/entity-timer-card",
   "integration_type": "service",
   "iot_class": "calculated",
-  "issue_tracker": "https://github.com/IoTiX-Automation/entity-timer-card/issues",
+  "issue_tracker": "https://github.com/IoTiX-Automations/entity-timer-card/issues",
   "requirements": [],
-  "version": "1.0.1"
+  "version": "1.0.2"
 }
