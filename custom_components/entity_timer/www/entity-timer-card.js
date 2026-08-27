@@ -204,19 +204,14 @@ class EntityTimerCard extends HTMLElement {
     const el = this.shadowRoot && this.shadowRoot.getElementById("timer");
     if (!el) return;
 
-    if (!this._timer) {
+    // Once the due time has passed (per this browser's clock), just hide
+    // the line instead of showing a placeholder — the actual revert has
+    // either already happened or is about to, and a stale "any moment"
+    // message lingering is more confusing than no message at all.
+    const remainingMs = this._timer ? new Date(this._timer.due).getTime() - Date.now() : -1;
+    if (!this._timer || remainingMs <= 0) {
       el.classList.remove("visible");
       el.textContent = "";
-      return;
-    }
-
-    const remainingMs = new Date(this._timer.due).getTime() - Date.now();
-    if (remainingMs <= 0) {
-      // The integration reverts to-the-second, so this should be
-      // momentary — shown only for the brief window before the next
-      // hass state update clears this._timer.
-      el.classList.add("visible");
-      el.textContent = `Turns ${this._timerVerb()} any moment…`;
       return;
     }
 
