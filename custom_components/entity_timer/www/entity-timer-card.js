@@ -201,6 +201,8 @@ class EntityTimerCard extends HTMLElement {
   }
 
   _tick() {
+    this._updateDialogCancelRow();
+
     const el = this.shadowRoot && this.shadowRoot.getElementById("timer");
     if (!el) return;
 
@@ -266,8 +268,9 @@ class EntityTimerCard extends HTMLElement {
     wrap.style.gap = "20px";
     wrap.style.minWidth = "280px";
 
-    if (this._timer) {
-      wrap.appendChild(this._buildCancelRow(dialog));
+    this._cancelRow = this._timer ? this._buildCancelRow(dialog) : null;
+    if (this._cancelRow) {
+      wrap.appendChild(this._cancelRow);
     }
 
     const onRow = this._buildRow(
@@ -287,10 +290,44 @@ class EntityTimerCard extends HTMLElement {
     wrap.appendChild(offRow);
     dialog.appendChild(wrap);
 
-    dialog.addEventListener("closed", () => dialog.remove());
+    dialog.addEventListener("closed", () => {
+      dialog.remove();
+      if (this._dialog === dialog) {
+        this._dialog = null;
+        this._cancelRow = null;
+      }
+    });
 
     this.shadowRoot.appendChild(dialog);
     this._dialog = dialog;
+  }
+
+  // Keeps the popup's "Currently: turns X in ..." row live while the
+  // dialog stays open — it's built once in _openDialog, so without this
+  // it would otherwise freeze at whatever it said at open time (e.g. a
+  // stale "any moment" that outlives the actual revert).
+  _updateDialogCancelRow() {
+    if (!this._cancelRow) return;
+
+    if (!this._timer) {
+      this._cancelRow.remove();
+      this._cancelRow = null;
+      return;
+    }
+
+    const remainingMs = new Date(this._timer.due).getTime() - Date.now();
+    const labelEl = this._cancelRow.querySelector(".label");
+    if (remainingMs <= 0) {
+      // Due but the revert hasn't landed in this._timer yet — hide the
+      // row rather than show a message that may already be stale by the
+      // time it's read, same reasoning as the main card's countdown.
+      this._cancelRow.remove();
+      this._cancelRow = null;
+      return;
+    }
+    if (labelEl) {
+      labelEl.textContent = `Currently: turns ${this._timerVerb()} in ${this._formatDuration(remainingMs)}`;
+    }
   }
 
   _buildCancelRow(dialog) {
@@ -300,10 +337,7 @@ class EntityTimerCard extends HTMLElement {
     const labelEl = document.createElement("div");
     labelEl.className = "label";
     const remainingMs = new Date(this._timer.due).getTime() - Date.now();
-    labelEl.textContent =
-      remainingMs > 0
-        ? `Currently: turns ${this._timerVerb()} in ${this._formatDuration(remainingMs)}`
-        : `Currently: turns ${this._timerVerb()} any moment…`;
+    labelEl.textContent = `Currently: turns ${this._timerVerb()} in ${this._formatDuration(remainingMs)}`;
 
     const button = document.createElement("button");
     button.type = "button";
