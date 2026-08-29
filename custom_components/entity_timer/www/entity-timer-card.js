@@ -19,6 +19,21 @@
  *   entity: switch.something   (required)
  *   name: Friendly name        (optional, defaults to entity's name)
  *   icon: mdi:something        (optional, defaults to entity's icon)
+ *   icon_only: true            (optional — renders as a bare icon instead
+ *                                of a full row, for use as a picture-elements
+ *                                element; tap still opens the same popup)
+ *
+ * Picture Elements usage:
+ *   type: picture-elements
+ *   image: /local/floorplan.png
+ *   elements:
+ *     - type: custom:entity-timer-card
+ *       entity: switch.some_entity
+ *       icon_only: true
+ *       style:
+ *         top: 40%
+ *         left: 60%
+ *         "--entity-timer-icon-size": "32px"
  */
 
 const PENDING_SENSOR_ENTITY_ID = "sensor.entity_timer_pending";
@@ -29,6 +44,7 @@ class EntityTimerCard extends HTMLElement {
       throw new Error("Please define an entity");
     }
     this._config = config;
+    this._iconOnly = !!config.icon_only;
     this._timer = null; // { due: ISOstring, description: 'on'|'off' }
     this._buildCard();
   }
@@ -62,6 +78,14 @@ class EntityTimerCard extends HTMLElement {
     this._built = true;
 
     this.attachShadow({ mode: "open" });
+    if (this._iconOnly) {
+      this._buildIconOnly();
+    } else {
+      this._buildFullCard();
+    }
+  }
+
+  _buildFullCard() {
     this.shadowRoot.innerHTML = `
       <style>
         ha-card {
@@ -162,8 +186,76 @@ class EntityTimerCard extends HTMLElement {
     });
   }
 
+  // Compact mode for picture-elements: a bare icon (no card chrome), sized
+  // via the --entity-timer-icon-size custom property (settable through the
+  // element's own `style:` block in the picture-elements config), colored
+  // by entity state, with a small dot while a timer is pending. Tap opens
+  // the same dialog as the full card.
+  _buildIconOnly() {
+    this.shadowRoot.innerHTML = `
+      <style>
+        :host {
+          display: inline-block;
+        }
+        .wrap {
+          position: relative;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          -webkit-tap-highlight-color: transparent;
+        }
+        ha-icon {
+          --mdc-icon-size: var(--entity-timer-icon-size, 24px);
+          color: var(--entity-timer-icon-color-off, var(--paper-item-icon-color, #44739e));
+          transition: color 0.2s ease;
+        }
+        .wrap:focus-visible {
+          outline: 2px solid var(--primary-color);
+          outline-offset: 2px;
+          border-radius: 50%;
+        }
+        .wrap.state-on ha-icon {
+          color: var(--entity-timer-icon-color-on, var(--paper-item-icon-active-color, #fdd835));
+        }
+        .badge {
+          position: absolute;
+          top: -2px;
+          right: -2px;
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          background: var(--primary-color);
+          box-shadow: 0 0 0 2px var(--card-background-color, #fff);
+          display: none;
+        }
+        .wrap.timer-pending .badge {
+          display: block;
+        }
+      </style>
+      <div class="wrap" tabindex="0" role="button">
+        <ha-icon id="icon"></ha-icon>
+        <div class="badge"></div>
+      </div>
+    `;
+
+    const wrap = this.shadowRoot.querySelector(".wrap");
+    wrap.addEventListener("click", () => this._openDialog());
+    wrap.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter" || ev.key === " ") {
+        ev.preventDefault();
+        this._openDialog();
+      }
+    });
+  }
+
   _updateCard() {
     if (!this._hass || !this._config) return;
+    if (this._iconOnly) {
+      this._updateIconOnly();
+      return;
+    }
+
     const stateObj = this._hass.states[this._config.entity];
 
     const iconEl = this.shadowRoot.getElementById("icon");
@@ -185,6 +277,26 @@ class EntityTimerCard extends HTMLElement {
       this._config.icon || stateObj.attributes.icon || "mdi:toggle-switch-outline";
   }
 
+  _updateIconOnly() {
+    const stateObj = this._hass.states[this._config.entity];
+    const iconEl = this.shadowRoot.getElementById("icon");
+    const wrap = this.shadowRoot.querySelector(".wrap");
+    if (!iconEl || !wrap) return;
+
+    const title = this._config.name || (stateObj && stateObj.attributes.friendly_name) || this._config.entity;
+    wrap.title = title;
+    wrap.setAttribute("aria-label", title);
+
+    if (!stateObj) {
+      iconEl.icon = this._config.icon || "mdi:help-circle-outline";
+      wrap.classList.remove("state-on");
+      return;
+    }
+
+    iconEl.icon = this._config.icon || stateObj.attributes.icon || "mdi:toggle-switch-outline";
+    wrap.classList.toggle("state-on", stateObj.state === "on");
+  }
+
   _updateTimerFromHass() {
     const sensor = this._hass.states[PENDING_SENSOR_ENTITY_ID];
     if (!sensor) return;
@@ -202,6 +314,15 @@ class EntityTimerCard extends HTMLElement {
 
   _tick() {
     this._updateDialogCancelRow();
+
+    if (this._iconOnly) {
+      const wrap = this.shadowRoot && this.shadowRoot.querySelector(".wrap");
+      if (wrap) {
+        const pending = !!this._timer && new Date(this._timer.due).getTime() - Date.now() > 0;
+        wrap.classList.toggle("timer-pending", pending);
+      }
+      return;
+    }
 
     const el = this.shadowRoot && this.shadowRoot.getElementById("timer");
     if (!el) return;

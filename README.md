@@ -49,6 +49,31 @@ name: Optional display name
 icon: mdi:optional-icon
 ```
 
+### As a Picture Elements icon
+
+Set `icon_only: true` to render a bare, colored icon (no card box) instead
+of the full row — for use as an element inside a `picture-elements` card.
+Tap still opens the same popup.
+
+```yaml
+type: picture-elements
+image: /local/floorplan.png
+elements:
+  - type: custom:entity-timer-card
+    entity: switch.some_entity
+    icon_only: true
+    style:
+      top: 40%
+      left: 60%
+      "--entity-timer-icon-size": "32px"
+```
+
+The icon is colored via `--entity-timer-icon-color-off` /
+`--entity-timer-icon-color-on` (falling back to the usual HA icon-color
+variables), sized via `--entity-timer-icon-size` (default `24px`), and
+shows a small dot while a timer is pending — all settable per-element
+through the `style:` block above.
+
 ## Services
 
 The integration also exposes two services directly, usable from
