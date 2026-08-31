@@ -42,6 +42,10 @@ then add the dashboard resource — all as above.
 
 ## Using the card
 
+Add it through the dashboard UI (Add Card → search "Entity Timer Card") to
+get a visual editor — entity picker, name, icon, and a "Minimized" toggle —
+instead of writing YAML by hand. Or write it directly:
+
 ```yaml
 type: custom:entity-timer-card
 entity: switch.some_entity

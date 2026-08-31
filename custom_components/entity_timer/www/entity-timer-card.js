@@ -73,6 +73,10 @@ class EntityTimerCard extends HTMLElement {
     return { entity: "" };
   }
 
+  static getConfigElement() {
+    return document.createElement("entity-timer-card-editor");
+  }
+
   _buildCard() {
     if (this._built) return;
     this._built = true;
@@ -539,3 +543,71 @@ window.customCards.push({
   name: "Entity Timer Card",
   description: "Tap an entity to schedule turning it on or off until a chosen date & time.",
 });
+
+/**
+ * Visual editor: HA's "Edit card" UI calls EntityTimerCard.getConfigElement(),
+ * which returns one of these. It wraps HA's own <ha-form> (the same
+ * schema-driven form used by built-in card editors) so the entity/icon
+ * pickers and the "Minimized" toggle are proper native widgets, not raw
+ * YAML. Contract: setConfig()/hass in, "config-changed" CustomEvent out
+ * with { config } in its detail — the same pattern HA's built-in card
+ * editors use (confirmed against hui-shortcut-card-editor.ts).
+ */
+class EntityTimerCardEditor extends HTMLElement {
+  setConfig(config) {
+    this._config = config || {};
+    this._render();
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    this._render();
+  }
+
+  _render() {
+    if (!this._hass || !this._config) return;
+
+    if (!this._form) {
+      this._form = document.createElement("ha-form");
+      this._form.addEventListener("value-changed", (ev) => this._valueChanged(ev));
+      this.appendChild(this._form);
+    }
+
+    this._form.hass = this._hass;
+    this._form.data = this._config;
+    this._form.schema = EntityTimerCardEditor.SCHEMA;
+    this._form.computeLabel = EntityTimerCardEditor.computeLabel;
+  }
+
+  _valueChanged(ev) {
+    ev.stopPropagation();
+    const config = { ...ev.detail.value };
+    this._config = config;
+    this.dispatchEvent(
+      new CustomEvent("config-changed", {
+        detail: { config },
+        bubbles: true,
+        composed: true,
+      })
+    );
+  }
+}
+
+EntityTimerCardEditor.SCHEMA = [
+  { name: "entity", required: true, selector: { entity: {} } },
+  { name: "name", selector: { text: {} } },
+  { name: "icon", selector: { icon: {} } },
+  { name: "icon_only", selector: { boolean: {} } },
+];
+
+EntityTimerCardEditor.computeLabel = (schema) => {
+  const labels = {
+    entity: "Entity",
+    name: "Name",
+    icon: "Icon",
+    icon_only: "Minimized (icon only — for use in Picture Elements)",
+  };
+  return labels[schema.name] || schema.name;
+};
+
+customElements.define("entity-timer-card-editor", EntityTimerCardEditor);
