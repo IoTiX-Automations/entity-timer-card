@@ -8,8 +8,9 @@ Tap the card → a dialog opens with two options, **"Turn ON until"** and
 **"Turn OFF until"**, each with a date/time picker. Confirming flips the
 entity immediately and schedules reverting it back at the chosen moment.
 The card shows a live countdown to the scheduled flip. If a timer is
-already pending, the dialog also shows a **Cancel** option to stop it
-early without changing the entity's current state.
+already pending, the dialog also shows a **Cancel (revert now)** option
+that immediately reverts the entity to its normal state instead of
+waiting for the scheduled time.
 
 Pending timers are persisted to storage and rescheduled on startup, so
 a Home Assistant restart mid-countdown does not lose the revert.
@@ -75,8 +76,9 @@ elements:
 The icon is colored via `--entity-timer-icon-color-off` /
 `--entity-timer-icon-color-on` (falling back to the usual HA icon-color
 variables), sized via `--entity-timer-icon-size` (default `24px`), and
-shows a small dot while a timer is pending — all settable per-element
-through the `style:` block above.
+shows a small countdown pill below it while a timer is pending — colored
+via `--entity-timer-label-background` / `--entity-timer-label-color` —
+all settable per-element through the `style:` block above.
 
 ## Services
 
@@ -86,7 +88,8 @@ automations/scripts without the card:
 - `entity_timer.set` — fields `entity_id`, `state` (`on`/`off`),
   `until` (datetime). Applies the state now and schedules the revert.
 - `entity_timer.cancel` — field `entity_id`. Cancels a pending
-  timer without changing the entity's current state.
+  timer, immediately reverting the entity to its normal state instead
+  of waiting for the scheduled time.
 
 ## How it works
 

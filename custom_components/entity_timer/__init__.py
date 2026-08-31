@@ -122,10 +122,18 @@ class EntityTimerManager:
         await self._async_call_state(entity_id, state)
 
     async def async_cancel(self, entity_id: str) -> None:
-        """Cancel a pending timer without changing the entity's current state."""
+        """Cancel a pending timer, immediately reverting the entity to its normal state.
+
+        Cancelling ends the override — it does not just forget about it and
+        leave the entity stuck in the overridden state until someone
+        remembers to flip it back by hand.
+        """
         self._cancel_timer_callback(entity_id)
-        if self._timers.pop(entity_id, None) is not None:
-            await self._async_save()
+        info = self._timers.pop(entity_id, None)
+        if info is None:
+            return
+        await self._async_save()
+        await self._async_call_state(entity_id, info["revert_state"])
 
     async def async_reschedule_all(self) -> None:
         """Called on startup: reschedule pending timers, revert any already due."""

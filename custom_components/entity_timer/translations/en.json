@@ -31,7 +31,7 @@
     },
     "cancel": {
       "name": "Cancel timer",
-      "description": "Cancel a pending timer for an entity, without changing its current state.",
+      "description": "Cancel a pending timer for an entity, immediately reverting it to its normal state instead of waiting for the scheduled time.",
       "fields": {
         "entity_id": {
           "name": "Entity",
