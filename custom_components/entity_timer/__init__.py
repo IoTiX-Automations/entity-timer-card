@@ -36,6 +36,7 @@ from .const import (
     ATTR_UNTIL,
     CARD_JS_FILENAME,
     CARD_URL_PATH,
+    DATA_STATIC_PATH_REGISTERED,
     DOMAIN,
     SERVICE_CANCEL,
     SERVICE_SET,
@@ -174,10 +175,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # dashboard resource once (Settings > Dashboards > Resources) — see
     # the README; Lovelace does not pick up card elements from
     # frontend.add_extra_js_url.
-    www_dir = pathlib.Path(__file__).parent / "www"
-    await hass.http.async_register_static_paths(
-        [StaticPathConfig(CARD_URL_PATH, str(www_dir / CARD_JS_FILENAME), cache_headers=False)]
-    )
+    #
+    # Only register once per process: aiohttp raises if the same path is
+    # registered twice, and async_setup_entry runs again on every reload
+    # of the integration (not just on a full HA restart, which is the only
+    # thing that actually resets the underlying route table).
+    if not hass.data.get(DATA_STATIC_PATH_REGISTERED):
+        www_dir = pathlib.Path(__file__).parent / "www"
+        await hass.http.async_register_static_paths(
+            [StaticPathConfig(CARD_URL_PATH, str(www_dir / CARD_JS_FILENAME), cache_headers=False)]
+        )
+        hass.data[DATA_STATIC_PATH_REGISTERED] = True
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
