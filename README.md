@@ -1,4 +1,6 @@
-# Entity Timer
+<p align="center">
+  <img src="custom_components/entity_timer/brand/logo.png" alt="Entity Timer for Home Assistant" width="220">
+</p>
 
 A Home Assistant integration + companion Lovelace card that turns any
 entity on or off **until** a chosen date & time, then automatically
