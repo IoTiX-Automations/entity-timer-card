@@ -21,8 +21,8 @@ a Home Assistant restart mid-countdown does not lose the revert.
 
 ### HACS (recommended)
 
-1. HACS → Integrations → ⋮ → Custom repositories → add this repository
-   URL with category **Integration** (once accepted into the default
+1. HACS → Integrations → ⋮ → Custom repositories → add the repository
+   **https://github.com/IoTiX-Automations/entity-timer-card** with category **Integration** (once accepted into the default
    HACS store, this step won't be necessary — just search "Entity
    Timer").
 2. Install **Entity Timer**, then restart Home Assistant.
